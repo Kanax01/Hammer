@@ -56,7 +56,7 @@ def banner():
     
     print(Fore.CYAN + Style.BRIGHT + "\nBy, Kanax01" + Style.RESET_ALL)
     print(Fore.CYAN + Style.BRIGHT + "Hammer -- iDDOS Tool" + Style.RESET_ALL)
-    print(Fore.CYAN + Style.BRIGHT + "Use responsibly!!!" Style.RESET_ALL)
+    print(Fore.CYAN + Style.BRIGHT + "Use responsibly!!!" + Style.RESET_ALL)
     
 
 def build_headers(useragents, referers):
