@@ -151,7 +151,6 @@ def install_tor():
 
 def start_tor():
     """Start Tor process with SOCKS5 proxy configuration or detect existing Tor"""
-    global TOR_PROCESS
     
     # First, check if Tor is already running
     print(Fore.YELLOW + "[*] Checking for running Tor instance..." + Style.RESET_ALL)
