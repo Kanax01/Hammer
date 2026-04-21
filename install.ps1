@@ -72,40 +72,40 @@ function Install-Hammer {
         exit 1
     }
     
-    # Install the package
-    Write-Host "[*] Installing Hammer package..." -ForegroundColor Yellow
-    Push-Location $projectDir
-    & $pythonPath -m pip install -e .
-    Pop-Location
+    # Copy files to Program Files
+    $installDir = "C:\Program Files\Hammer"
+    Write-Host "[*] Creating installation directory: $installDir" -ForegroundColor Yellow
     
-    if ($LASTEXITCODE -ne 0) {
-        Write-Host "[-] Failed to install Hammer" -ForegroundColor Red
-        exit 1
+    if (-not (Test-Path $installDir)) {
+        New-Item -ItemType Directory -Force -Path $installDir | Out-Null
     }
     
-    # Create batch wrapper (optional, adds to easier access)
-    $binDir = Join-Path $PROFILE "..\..\bin"
-    New-Item -ItemType Directory -Force -Path $binDir | Out-Null
+    Write-Host "[*] Copying Hammer files..." -ForegroundColor Yellow
+    Copy-Item -Path (Join-Path $projectDir "hammer.py") -Destination $installDir -Force
+    Copy-Item -Path (Join-Path $projectDir "referers.py") -Destination $installDir -Force
+    Copy-Item -Path (Join-Path $projectDir "useragents.py") -Destination $installDir -Force
+    Copy-Item -Path (Join-Path $projectDir "requirements.txt") -Destination $installDir -Force
     
-    $batchFile = Join-Path $binDir "hammer.bat"
-    $wrapperContent = "@echo off`r`npython -m hammer %*"
-    
+    # Create batch wrapper
+    $batchFile = Join-Path $installDir "hammer.bat"
+    $wrapperContent = "@echo off`r`npython `"$installDir\hammer.py`" %*"
     Set-Content -Path $batchFile -Value $wrapperContent -Encoding ASCII
     Write-Host "[+] Created wrapper: $batchFile" -ForegroundColor Green
     
     # Add to PATH if needed
-    $pathEntry = $binDir
     $envPath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
     
-    if (-not $envPath.Contains($pathEntry)) {
+    if (-not $envPath.Contains($installDir)) {
         Write-Host "[*] Adding Hammer to system PATH..." -ForegroundColor Yellow
-        [Environment]::SetEnvironmentVariable("PATH", "$envPath;$pathEntry", "Machine")
-        $env:PATH = "$env:PATH;$pathEntry"
-        Write-Host "[+] Added to PATH: $pathEntry" -ForegroundColor Green
+        [Environment]::SetEnvironmentVariable("PATH", "$envPath;$installDir", "Machine")
+        $env:PATH = "$env:PATH;$installDir"
+        Write-Host "[+] Added to PATH: $installDir" -ForegroundColor Green
+    } else {
+        Write-Host "[+] Already in PATH" -ForegroundColor Green
     }
     
     Write-Title "Installation Complete!"
-    Write-Host "[+] Hammer has been successfully installed!" -ForegroundColor Green
+    Write-Host "[+] Hammer has been successfully installed to: $installDir" -ForegroundColor Green
     Write-Host "[*] You can now run 'hammer' from any terminal" -ForegroundColor Cyan
     Write-Host "[*] Note: You may need to restart your terminal for changes to take effect" -ForegroundColor Yellow
 }
@@ -120,13 +120,22 @@ function Uninstall-Hammer {
         exit 1
     }
     
-    $pythonPath = Find-Python
-    if ($null -eq $pythonPath) {
-        exit 1
+    $installDir = "C:\Program Files\Hammer"
+    
+    if (Test-Path $installDir) {
+        Write-Host "[*] Removing Hammer from: $installDir" -ForegroundColor Yellow
+        Remove-Item -Path $installDir -Recurse -Force
+        Write-Host "[+] Hammer files removed" -ForegroundColor Green
     }
     
-    Write-Host "[*] Uninstalling Hammer package..." -ForegroundColor Yellow
-    & $pythonPath -m pip uninstall Hammer -y
+    # Remove from PATH
+    $envPath = [Environment]::GetEnvironmentVariable("PATH", "Machine")
+    if ($envPath.Contains($installDir)) {
+        Write-Host "[*] Removing from PATH..." -ForegroundColor Yellow
+        $newPath = $envPath -replace [regex]::Escape("$installDir;"), "" -replace [regex]::Escape(";$installDir"), ""
+        [Environment]::SetEnvironmentVariable("PATH", $newPath, "Machine")
+        Write-Host "[+] Removed from PATH" -ForegroundColor Green
+    }
     
     Write-Host "[+] Hammer has been uninstalled" -ForegroundColor Green
 }

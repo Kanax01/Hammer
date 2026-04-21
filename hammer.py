@@ -82,16 +82,22 @@ def listen_for_end():
                     sys.exit()
 
 
-def is_tor_ready(host='127.0.0.1', port=9050, timeout=2):
-    """Check if Tor SOCKS5 proxy is ready and listening"""
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
-        result = sock.connect_ex((host, port))
-        sock.close()
-        return result == 0
-    except Exception:
-        return False
+def is_tor_ready(host='127.0.0.1', ports=[9050, 9150, 8118], timeout=2):
+    """Check if Tor SOCKS5 proxy is ready and listening on any common port"""
+    if isinstance(ports, int):
+        ports = [ports]
+    
+    for port in ports:
+        try:
+            sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            sock.settimeout(timeout)
+            result = sock.connect_ex((host, port))
+            sock.close()
+            if result == 0:
+                return True
+        except Exception:
+            continue
+    return False
 
 
 def install_tor():
@@ -144,18 +150,24 @@ def install_tor():
 
 
 def start_tor():
-    """Start Tor process with SOCKS5 proxy configuration"""
+    """Start Tor process with SOCKS5 proxy configuration or detect existing Tor"""
     global TOR_PROCESS
+    
+    # First, check if Tor is already running
+    print(Fore.YELLOW + "[*] Checking for running Tor instance..." + Style.RESET_ALL)
+    if is_tor_ready():
+        print(Fore.GREEN + "[+] Tor is already running and ready!" + Style.RESET_ALL)
+        return "success"
     
     try:
         print(Fore.YELLOW + "[*] Launching Tor..." + Style.RESET_ALL)
         
         # Create Tor configuration
-        tor_config = """
-            SocksPort 9050
-            ControlPort 9051
-            Log notice stdout
-            RunAsDaemon 0"""
+        tor_config = """SocksPort 9050
+ControlPort 9051
+Log notice stdout
+RunAsDaemon 0
+"""
         
         # Write config to temp file
         config_path = os.path.join(os.path.expanduser('~'), '.tor_config')
@@ -165,8 +177,8 @@ def start_tor():
         # Start Tor process
         TOR_PROCESS = subprocess.Popen(
             ['tor', '-f', config_path],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
             creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
         )
         
@@ -215,12 +227,20 @@ def stop_tor():
 def send_request(session, target, headers, timeout=5, use_tor=False):
     try:
         if use_tor:
-            # Route through Tor using SOCKS5 proxy
+            # Try to route through Tor SOCKS5 proxy on common ports
             proxies = {
                 'http': 'socks5://127.0.0.1:9050',
                 'https': 'socks5://127.0.0.1:9050'
             }
-            response = session.get(target, headers=headers, timeout=timeout, proxies=proxies)
+            try:
+                response = session.get(target, headers=headers, timeout=timeout, proxies=proxies)
+            except Exception:
+                # Fallback to port 9150 (Tor Browser default)
+                proxies = {
+                    'http': 'socks5://127.0.0.1:9150',
+                    'https': 'socks5://127.0.0.1:9150'
+                }
+                response = session.get(target, headers=headers, timeout=timeout, proxies=proxies)
         else:
             response = session.get(target, headers=headers, timeout=timeout)
         return response.status_code

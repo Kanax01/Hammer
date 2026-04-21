@@ -68,15 +68,30 @@ If the automated installers don't work, follow these steps:
    python -m pip install -r requirements.txt
    ```
 
-4. **Install Hammer**
+4. **Copy files to Program Files**
    ```cmd
-   python -m pip install -e .
+   mkdir "C:\Program Files\Hammer"
+   copy *.py "C:\Program Files\Hammer\"
    ```
 
-5. **Test installation**
-   ```cmd
-   hammer
+5. **Create batch wrapper** (save as `C:\Program Files\Hammer\hammer.bat`)
+   ```batch
+   @echo off
+   python "C:\Program Files\Hammer\hammer.py" %*
    ```
+
+6. **Add to PATH**
+   - Right-click "This PC" or "My Computer" → Properties
+   - Click "Advanced system settings"
+   - Click "Environment Variables"
+   - Under "System variables", find and select "Path"
+   - Click "Edit"
+   - Click "New" and add: `C:\Program Files\Hammer`
+   - Click OK on all dialogs
+
+7. **Test installation**
+   - Open a new Command Prompt or PowerShell
+   - Type: `hammer`
 
 ## Usage
 
@@ -92,20 +107,32 @@ Then follow the prompts to:
 - Set the number of concurrent threads
 - Choose whether to use Tor (optional)
 
+## Where Hammer is Installed
+
+The installer copies Hammer to: `C:\Program Files\Hammer\`
+
+You can also run it directly from the source directory:
+```cmd
+cd C:\path\to\Hammer
+python hammer.py
+```
+
 ## Uninstalling
 
-To uninstall Hammer:
-
-**Using PowerShell:**
+### Using PowerShell:
 ```powershell
 Set-ExecutionPolicy -ExecutionPolicy Bypass -Scope CurrentUser -Force
 .\install.ps1 -Uninstall
 ```
 
-**Using Command Prompt or PowerShell:**
-```cmd
-python -m pip uninstall Hammer -y
-```
+### Manual Uninstall:
+1. Delete the folder: `C:\Program Files\Hammer\`
+2. Remove from PATH:
+   - Right-click "This PC" → Properties
+   - Advanced system settings → Environment Variables
+   - Find "Path" under System variables → Edit
+   - Find and delete the line containing `C:\Program Files\Hammer`
+   - Click OK
 
 ## Troubleshooting
 

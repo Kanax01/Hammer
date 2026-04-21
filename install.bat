@@ -49,7 +49,7 @@ echo.
 
 REM Install pip dependencies
 echo [*] Installing Python dependencies...
-python -m pip install --upgrade pip
+python -m pip install --upgrade pip >nul 2>&1
 if errorlevel 1 (
     echo [-] Failed to upgrade pip
     pause
@@ -63,14 +63,60 @@ if errorlevel 1 (
     exit /b 1
 )
 
-REM Install the package
-echo [*] Installing Hammer package...
-cd /d "%PROJECT_DIR%"
-python -m pip install -e .
-if errorlevel 1 (
-    echo [-] Failed to install Hammer
+REM Create installation directory
+set INSTALL_DIR=%PROGRAMFILES%\Hammer
+if not exist "%INSTALL_DIR%" (
+    echo [*] Creating installation directory...
+    mkdir "%INSTALL_DIR%"
+)
+
+REM Copy project files to installation directory
+echo [*] Copying Hammer files to %INSTALL_DIR%...
+xcopy "%PROJECT_DIR%*.py" "%INSTALL_DIR%\" /Y /Q >nul
+xcopy "%PROJECT_DIR%requirements.txt" "%INSTALL_DIR%\" /Y /Q >nul
+
+if not exist "%INSTALL_DIR%hammer.py" (
+    echo [-] Failed to copy files
     pause
     exit /b 1
+)
+
+REM Create batch wrapper
+set BATCH_WRAPPER=%INSTALL_DIR%\hammer.bat
+echo Creating batch wrapper...
+(
+    echo @echo off
+    echo python "%INSTALL_DIR%\hammer.py" %%*
+) > "%BATCH_WRAPPER%"
+
+if not exist "%BATCH_WRAPPER%" (
+    echo [-] Failed to create wrapper
+    pause
+    exit /b 1
+)
+
+REM Add to PATH
+echo [*] Adding Hammer to system PATH...
+reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v PATH >nul 2>&1
+if errorlevel 1 (
+    echo [-] Failed to access registry
+    pause
+    exit /b 1
+)
+
+for /f "tokens=2*" %%A in ('reg query "HKLM\SYSTEM\CurrentControlSet\Control\Session Manager\Environment" /v PATH ^| find /i "PATH"') do (
+    set CURRENT_PATH=%%B
+)
+
+if not "!CURRENT_PATH!"=="" (
+    echo !CURRENT_PATH! | find /i "%INSTALL_DIR%" >nul 2>&1
+    if errorlevel 1 (
+        setx /M PATH "!CURRENT_PATH!;%INSTALL_DIR%"
+        set "PATH=!PATH!;%INSTALL_DIR%"
+        echo [+] Added to system PATH
+    ) else (
+        echo [+] Already in PATH
+    )
 )
 
 echo.
@@ -78,7 +124,7 @@ echo ============================================================
 echo               Installation Complete!
 echo ============================================================
 echo.
-echo [+] Hammer has been successfully installed!
+echo [+] Hammer has been successfully installed to: %INSTALL_DIR%
 echo [*] You can now run 'hammer' from any terminal
 echo [*] Note: You may need to restart your terminal for changes to take effect
 echo.
