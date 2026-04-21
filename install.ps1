@@ -88,7 +88,7 @@ function Install-Hammer {
     
     # Create batch wrapper
     $batchFile = Join-Path $installDir "hammer.bat"
-    $wrapperContent = "@echo off`r`npython `"$installDir\hammer.py`" %*"
+    $wrapperContent = "@echo off`r`ncd /d `"$installDir`"`r`npython hammer.py %*"
     Set-Content -Path $batchFile -Value $wrapperContent -Encoding ASCII
     Write-Host "[+] Created wrapper: $batchFile" -ForegroundColor Green
     

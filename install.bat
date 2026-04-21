@@ -83,10 +83,11 @@ if not exist "%INSTALL_DIR%hammer.py" (
 
 REM Create batch wrapper
 set BATCH_WRAPPER=%INSTALL_DIR%\hammer.bat
-echo Creating batch wrapper...
+echo [*] Creating batch wrapper...
 (
     echo @echo off
-    echo python "%INSTALL_DIR%\hammer.py" %%*
+    echo cd /d "%INSTALL_DIR%"
+    echo python hammer.py %%*
 ) > "%BATCH_WRAPPER%"
 
 if not exist "%BATCH_WRAPPER%" (
