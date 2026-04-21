@@ -205,8 +205,7 @@ RunAsDaemon 0
 
 
 def stop_tor():
-    """Stop Tor process gracefully"""
-    global TOR_PROCESS
+    """Stop Tor process"""
     
     if TOR_PROCESS:
         try:
@@ -280,7 +279,6 @@ def attack_target(target, useragents, referers, count, threads, use_tor=False):
 
 
 def main():
-    global TOR_PROCESS
     init(autoreset=True)
     os.system("title Hammer - By, Kanax01")
     banner()
